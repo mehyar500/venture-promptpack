@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PromptPack Pro — Your pack</title>
+<meta name="robots" content="noindex">
+<link rel="canonical" href="https://promptpack.mehyar.us/deliverable.html">
+<meta name="description" content="Your PromptPack Pro pack — 50 prompts and 10 swipe files, written for your trade.">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0c0a07">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="inner">
+    <a class="brand" href="index.html">Prompt<span>Pack</span><span class="pro-tag">PRO</span></a>
+    <nav class="nav">
+      <a href="index.html#teaser">Free prompts</a>
+      <a href="index.html#faq">FAQ</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <!-- generating / error state -->
+  <section id="loading-section">
+    <div class="progress-box">
+      <h2 id="loading-title">Writing your pack…</h2>
+      <p id="loading-copy"><span class="spinner"></span>Your 50 prompts and 10 swipe files are being generated for your trade. This usually takes a few minutes — this page updates on its own.</p>
+      <p class="status" id="loading-status"></p>
+      <div id="retry-box" hidden style="margin-top:16px">
+        <p>Generation hit a snag. Nothing was charged twice — your payment is fine.</p>
+        <button class="btn btn-primary" id="retry-btn" type="button">Retry generation</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ready state -->
+  <section id="pack-section" hidden>
+    <div class="pack-cover">
+      <p class="eyebrow">Your pack is ready</p>
+      <h1>PromptPack Pro — <span class="grad" id="pack-prof">your trade</span></h1>
+      <p class="hero-sub" id="pack-sub">50 prompts + 10 swipe files. Copy any prompt into ChatGPT or Claude, fill in the bracketed details, hit send.</p>
+      <div class="toolbar no-print">
+        <button class="btn btn-primary" id="pdf-btn" type="button">Download PDF</button>
+        <button class="btn btn-ghost" id="copy-all-btn" type="button">Copy all prompts</button>
+      </div>
+      <div class="pack-meta">
+        <span class="prof-pill" id="pack-prof-pill">—</span>
+        <span class="chips"><span>50 prompts</span><span>10 swipe files</span><span>Yours forever</span></span>
+      </div>
+    </div>
+
+    <h2 class="sec-title" style="margin-top:48px">The 50 prompts</h2>
+    <p class="sec-sub">Numbered, categorized, copy-paste ready.</p>
+    <div class="prompt-list" id="prompt-list"></div>
+
+    <div class="swipe-section">
+      <h2 class="sec-title">The 10 swipe files</h2>
+      <p class="sec-sub">Fully written messages — no AI call needed. Swap in your details and send.</p>
+      <div class="prompt-list" id="swipe-list"></div>
+    </div>
+
+    <p class="gallery-note" style="margin-top:32px">Full commercial rights — use these in your business however you like. Questions? <a href="mailto:info@mehyar.us">info@mehyar.us</a></p>
+  </section>
+</main>
+
+<footer>
+  <div class="inner footer-grid">
+    <div class="footer-base">
+      <span>© 2026 PromptPack Pro. This page is private to your purchase — keep the link safe.</span>
+      <span><a href="index.html#faq">FAQ</a> · <a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a> · <a href="mailto:info@mehyar.us">Contact</a></span>
+    </div>
+  </div>
+</footer>
+
+<div class="toast" id="toast" role="status"></div>
+<script src="app.js"></script>
+<script>
+(function () {
+  "use strict";
+  var qs = new URLSearchParams(window.location.search);
+  var token = qs.get("token") || qs.get("access_token");
+  var loadingSection = document.getElementById("loading-section");
+  var packSection = document.getElementById("pack-section");
+  var loadingStatus = document.getElementById("loading-status");
+  var retryBox = document.getElementById("retry-box");
+  var pack = null;
+  var profession = "contractor";
+  var pollTimer = null;
+
+  var PROF_NAMES = {
+    "contractor": "Contractor",
+    "realtor": "Realtor",
+    "coach-consultant": "Coach & Consultant",
+    "freelancer": "Freelancer"
+  };
+
+  function esc(s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  function showError(msg) {
+    document.getElementById("loading-title").textContent = "Couldn't open your pack";
+    document.getElementById("loading-copy").textContent = msg;
+    retryBox.hidden = true;
+  }
+
+  var driving = false; // guard: only one auto-drive chain at a time
+
+  // Client-driven generation: when the order isn't ready yet, fire the 3
+  // generation batches in order (one model call per request). The server
+  // never chains them in the background — edge waitUntil isn't reliable
+  // for multi-minute work.
+  function driveBatches() {
+    if (driving) return Promise.resolve();
+    driving = true;
+    loadingStatus.textContent = "Writing your pack now — this usually takes a few minutes.";
+    var batches = [1, 2, 3];
+    var chain = Promise.resolve();
+    batches.forEach(function (b) {
+      chain = chain.then(function () {
+        return fetch("/api/promptpack/generate", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ order_token: token, profession: profession, batch: b })
+        }).then(function (r) { return r.json().catch(function () { return {}; }); })
+          .catch(function () { return {}; });
+      });
+    });
+    return chain.catch(function () {}).finally(function () { driving = false; });
+  }
+
+  function check() {
+    if (!token || token.length < 16) {
+      showError("This link needs your access token. Open the private link from your receipt email, or paste the token on the confirmation page.");
+      return;
+    }
+    loadingStatus.textContent = "";
+    fetch("/api/promptpack/status?token=" + encodeURIComponent(token))
+      .then(function (r) {
+        if (r.status === 404 || r.status === 403) throw new Error("bad_token");
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.json();
+      })
+      .then(function (j) {
+        if (!j || !j.ok) throw new Error("bad_payload");
+        profession = j.profession || "contractor";
+        if (j.ready && j.pack) {
+          pack = j.pack;
+          renderPack();
+          // Nudge the buyer email (idempotent server-side).
+          fetch("/api/promptpack/notify-ready", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ order_token: token })
+          }).catch(function () {});
+        } else if (j.status === "failed") {
+          document.getElementById("loading-title").textContent = "Generation hit a snag";
+          document.getElementById("loading-copy").textContent = "Your payment is fine — the pack just didn't finish writing. Hit retry and give it a few minutes.";
+          retryBox.hidden = false;
+        } else {
+          // Not ready yet — drive the batches ourselves, then keep polling.
+          driveBatches().finally(function () { schedulePoll(); });
+        }
+      })
+      .catch(function (e) {
+        if (String(e && e.message) === "bad_token") {
+          showError("This token doesn't match any pack. Double-check the link from your receipt email.");
+        } else {
+          loadingStatus.textContent = "Connection hiccup — retrying…";
+          schedulePoll();
+        }
+      });
+  }
+
+  function schedulePoll() {
+    clearTimeout(pollTimer);
+    pollTimer = setTimeout(check, 10000);
+  }
+
+  function renderPack() {
+    clearTimeout(pollTimer);
+    loadingSection.hidden = true;
+    packSection.hidden = false;
+    var profName = PROF_NAMES[profession] || profession;
+    document.getElementById("pack-prof").textContent = profName;
+    document.getElementById("pack-prof-pill").textContent = profName;
+    document.title = "PromptPack Pro — " + profName + " pack";
+
+    var prompts = (pack && pack.prompts) || [];
+    var host = document.getElementById("prompt-list");
+    host.innerHTML = prompts.map(function (p, i) {
+      return '<article class="prompt-card">' +
+        '<div class="prompt-head">' +
+          '<span class="prompt-n">#' + (i + 1) + '</span>' +
+          '<span class="cat">' + esc(p.category) + '</span>' +
+        "</div>" +
+        "<h3>" + esc(p.title) + "</h3>" +
+        '<div class="prompt-text">' + esc(p.prompt) + "</div>" +
+        '<button class="copy-btn" type="button" data-copy="' + esc(p.prompt) + '">Copy prompt</button>' +
+        "</article>";
+    }).join("");
+
+    var swipes = (pack && pack.swipes) || [];
+    var shost = document.getElementById("swipe-list");
+    shost.innerHTML = swipes.map(function (s, i) {
+      return '<article class="prompt-card swipe-card">' +
+        '<div class="prompt-head">' +
+          '<span class="prompt-n">SWIPE ' + (i + 1) + '</span>' +
+          '<span class="cat">' + esc(s.category) + '</span>' +
+        "</div>" +
+        "<h3>" + esc(s.title) + "</h3>" +
+        '<div class="prompt-text">' + esc(s.text) + "</div>" +
+        '<button class="copy-btn" type="button" data-copy="' + esc(s.text) + '">Copy swipe file</button>' +
+        "</article>";
+    }).join("");
+
+    /* wire copy buttons rendered above */
+    var all = document.querySelectorAll("#pack-section [data-copy]");
+    Array.prototype.forEach.call(all, function (btn) {
+      btn.addEventListener("click", function () {
+        var text = btn.getAttribute("data-copy") || "";
+        function done() {
+          btn.classList.add("copied");
+          var old = btn.textContent;
+          btn.textContent = "Copied ✓";
+          if (window.PromptPack) window.PromptPack.toast("Copied to clipboard");
+          setTimeout(function () { btn.classList.remove("copied"); btn.textContent = old; }, 1600);
+        }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(done, function () { done(); });
+        } else { done(); }
+      });
+    });
+  }
+
+  document.getElementById("pdf-btn").addEventListener("click", function () {
+    window.print();
+  });
+
+  document.getElementById("copy-all-btn").addEventListener("click", function () {
+    if (!pack) return;
+    var text = "PROMPTPACK PRO — " + (PROF_NAMES[profession] || profession).toUpperCase() + "\n\n" +
+      "== 50 PROMPTS ==\n\n" +
+      pack.prompts.map(function (p, i) {
+        return (i + 1) + ". " + p.title + " [" + p.category + "]\n" + p.prompt;
+      }).join("\n\n---\n\n") +
+      "\n\n== 10 SWIPE FILES ==\n\n" +
+      pack.swipes.map(function (s, i) {
+        return "SWIPE " + (i + 1) + ": " + s.title + " [" + s.category + "]\n" + s.text;
+      }).join("\n\n---\n\n");
+    function done() { if (window.PromptPack) window.PromptPack.toast("Whole pack copied"); }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, done);
+    } else { done(); }
+  });
+
+  document.getElementById("retry-btn").addEventListener("click", function () {
+    var btn = document.getElementById("retry-btn");
+    btn.disabled = true;
+    btn.textContent = "Retrying…";
+    retryBox.hidden = true;
+    document.getElementById("loading-copy").innerHTML = '<span class="spinner"></span>Retrying generation — give it a few minutes. This page updates on its own.';
+    // Generation runs as 3 sequential batches (one model call per request).
+    // Fire them in order, then resume polling via check().
+    var batches = [1, 2, 3];
+    var chain = Promise.resolve();
+    batches.forEach(function (b) {
+      chain = chain.then(function () {
+        return fetch("/api/promptpack/generate", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ order_token: token, profession: profession, batch: b })
+        });
+      });
+    });
+    chain.catch(function () {}).finally(function () {
+      setTimeout(function () {
+        btn.disabled = false;
+        btn.textContent = "Retry generation";
+        check();
+      }, 5000);
+    });
+  });
+
+  check();
+})();
+</script>
+</body>
+</html>

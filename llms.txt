@@ -1,0 +1,14 @@
+# PromptPack Pro
+
+Niche AI prompt packs + swipe files for working professionals. Pick one profession
+(contractor, realtor, coach/consultant, freelancer) and get 50 outcome-driven AI
+prompts plus 10 copy-paste swipe files, generated fresh for your trade.
+
+- Free teaser: 5 hand-written prompts per profession, no email required —
+  https://promptpack.mehyar.us/#teaser
+- Full pack: $19 one-time. 50 prompts + 10 swipe files. Private token-gated
+  deliverable page with one-click PDF download.
+- Checkout: centralized Stripe via https://mehyar.us/api/pay/checkout
+  (product_id: promptpack-pro, params: {profession}).
+- Contact: info@mehyar.us. Refunds: 7-day redo-or-refund.
+- No subscription. Buyer owns the output — full commercial rights, forever.

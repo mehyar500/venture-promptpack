@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PromptPack Pro — Order confirmed</title>
+<meta name="robots" content="noindex">
+<link rel="canonical" href="https://promptpack.mehyar.us/success.html">
+<meta name="description" content="Your PromptPack Pro order is confirmed. Your pack is being written.">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0c0a07">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="inner">
+    <a class="brand" href="index.html">Prompt<span>Pack</span><span class="pro-tag">PRO</span></a>
+    <nav class="nav">
+      <a href="index.html#teaser">Free prompts</a>
+      <a href="index.html#pricing">Pricing</a>
+      <a href="index.html#faq">FAQ</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <section class="centered">
+    <div class="check">✓</div>
+    <h1>You're in. Check your email.</h1>
+    <p class="lede">Receipt and order details are on their way. Your pack is being written automatically — usually within a few minutes — and lands at the email you checked out with.</p>
+    <p class="status busy" id="pay-status"><span class="spinner"></span>Confirming your payment…</p>
+  </section>
+
+  <section>
+    <h2 style="text-align:center">Your pack link</h2>
+    <p class="lede" style="text-align:center;margin-left:auto;margin-right:auto">The email we send you carries a private access link. It looks like this — paste it here to jump straight to your pack.</p>
+    <form id="token-form" novalidate>
+      <div class="token-form">
+        <input type="text" id="token-input" placeholder="paste your token" autocomplete="off" autocapitalize="off" spellcheck="false">
+        <button type="submit" class="btn btn-primary">Open my pack</button>
+      </div>
+      <div class="status" id="token-status" style="text-align:center"></div>
+    </form>
+    <p class="lede" style="font-size:14px;margin-top:12px;text-align:center;margin-left:auto;margin-right:auto">No token yet? It arrives with your receipt — usually within a minute.</p>
+  </section>
+
+  <section>
+    <div class="whatyouget">
+      <h3>What happens next</h3>
+      <ol class="steps">
+        <li><strong>We start immediately</strong><p>Your profession goes into the pack recipe — 50 prompts and 10 swipe files, generated fresh for your trade.</p></li>
+        <li><strong>You get a delivered email</strong><p>Usually within a few minutes, your private pack link and access token arrive.</p></li>
+        <li><strong>It lives at your private link</strong><p>Your deliverable page with a one-click PDF download. The pack stays available there whenever you need it.</p></li>
+      </ol>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="inner footer-grid">
+    <div class="footer-base">
+      <span>© 2026 PromptPack Pro. Free teaser, $19 full pack, honesty included.</span>
+      <span><a href="index.html#faq">FAQ</a> · <a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a> · <a href="mailto:info@mehyar.us">Contact</a></span>
+    </div>
+  </div>
+</footer>
+
+<div class="toast" id="toast" role="status"></div>
+<script src="app.js"></script>
+<script>
+(function () {
+  "use strict";
+  var qs = new URLSearchParams(window.location.search);
+  var token = qs.get("token") || qs.get("access_token");
+
+  /* fulfill backfill: safety net if the Stripe webhook missed this payment.
+   * Idempotent — the server skips when an order already exists. */
+  if (token && token.length >= 16) {
+    var input = document.getElementById("token-input");
+    if (input && !input.value) input.value = token;
+    try {
+      fetch("https://mehyar.us/api/pay/fulfill-backfill", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: token })
+      }).catch(function () { /* silent */ });
+    } catch (e) { /* silent */ }
+  }
+
+  /* token form → deliverable */
+  document.getElementById("token-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var t = document.getElementById("token-input").value.trim();
+    var st = document.getElementById("token-status");
+    if (!t || t.length < 16) {
+      st.textContent = "That token looks too short — paste the full token from your email.";
+      st.className = "status error";
+      return;
+    }
+    window.location.href = "deliverable.html?token=" + encodeURIComponent(t);
+  });
+
+  /* payment status poll */
+  var payStatus = document.getElementById("pay-status");
+  if (token && token.length >= 16) {
+    var tries = 0;
+    (function poll() {
+      tries++;
+      fetch("https://mehyar.us/api/pay/status?token=" + encodeURIComponent(token))
+        .then(function (r) { return r.json(); })
+        .then(function (j) {
+          if (j && j.paid) {
+            payStatus.innerHTML = "Payment confirmed — your pack is being written. <a href=\"deliverable.html?token=" +
+              encodeURIComponent(token) + "\" style=\"color:var(--accent)\">Open the pack page →</a>";
+            payStatus.className = "status ok";
+          } else if (tries < 20) {
+            setTimeout(poll, 8000);
+          } else {
+            payStatus.textContent = "Still confirming — your receipt email has the full details.";
+            payStatus.className = "status";
+          }
+        })
+        .catch(function () {
+          if (tries < 20) setTimeout(poll, 8000);
+        });
+    })();
+  } else {
+    payStatus.textContent = "";
+    payStatus.className = "status";
+  }
+})();
+</script>
+</body>
+</html>

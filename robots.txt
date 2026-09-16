@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /deliverable.html
+Disallow: /success.html
+
+Sitemap: https://promptpack.mehyar.us/sitemap.xml
