@@ -10,5 +10,5 @@ prompts plus 10 copy-paste swipe files, generated fresh for your trade.
   deliverable page with one-click PDF download.
 - Checkout: centralized Stripe via https://mehyar.us/api/pay/checkout
   (product_id: promptpack-pro, params: {profession}).
-- Contact: info@mehyar.us. Refunds: 7-day redo-or-refund.
+- Contact: info@mehyar.us. All sales are final.
 - No subscription. Buyer owns the output — full commercial rights, forever.
