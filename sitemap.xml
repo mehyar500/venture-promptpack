@@ -7,4 +7,9 @@
   <url><loc>https://promptpack.mehyar.us/prompt-wins/</loc><lastmod>2026-11-22</lastmod></url>
   <url><loc>https://promptpack.mehyar.us/holiday-prompt-deals/</loc><lastmod>2026-11-24</lastmod></url>
   <url><loc>https://promptpack.mehyar.us/black-friday-prompt-deals/</loc><lastmod>2026-11-25</lastmod></url>
+  <url>
+    <loc>https://promptpack.mehyar.us/christmas-prompt-quiz/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
 </urlset>
